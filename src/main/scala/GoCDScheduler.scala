@@ -1,6 +1,7 @@
 package com.indix.mesos
 
 import com.typesafe.config.ConfigFactory
+import mesosphere.mesos.protos.FrameworkInfo
 import org.apache.mesos.Protos.CommandInfo.URI
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo
 import org.apache.mesos.Protos.Environment.Variable
@@ -110,12 +111,16 @@ class GoCDScheduler(
             .build)
         .setName(id)
         .setTaskId(TaskID.newBuilder.setValue(id))
-        .setContainer(ContainerInfo.newBuilder()
+
+       if(goTask.dockerImage.nonEmpty)
+        task.setContainer(ContainerInfo.newBuilder()
           .setType(ContainerInfo.Type.DOCKER)
           .setDocker(DockerInfo.newBuilder()
             .setImage(goTask.dockerImage)
             .build
          ).build)
+
+       task
         .addResources(Resource.newBuilder().setName("cpus").setScalar(Value.Scalar.newBuilder().setValue(needed.cpus)).build)
         .addResources(Resource.newBuilder().setName("mem").setScalar(Value.Scalar.newBuilder().setValue(needed.memory)).build)
         .setSlaveId(offer.getSlaveId)
@@ -138,7 +143,18 @@ class GoCDScheduler(
 object GoCDMesosFramework extends App {
   val config = new FrameworkConfig(ConfigFactory.load())
   val framework = FrameworkInfo("GOCD-Mesos")
-
+  val poller = GOCDPoller(config.goMasterServer, config.goUserName, config.goPassword)
+  val timeInterval = 1000;
+  val runnable = new Runnable {
+    override def run(): Unit = {
+      while(true) {
+        poller.pollAndAddTask
+        Thread.sleep(timeInterval)
+      }
+    }
+  }
+  val thread = new Thread(runnable);
+  thread.start();
   val scheduler = new GoCDScheduler(config)
   val driver = new MesosSchedulerDriver(scheduler, framework.toProto, config.mesosMaster)
   driver.run();
