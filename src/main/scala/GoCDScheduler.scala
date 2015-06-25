@@ -1,7 +1,6 @@
 package com.indix.mesos
 
 import com.typesafe.config.ConfigFactory
-import mesosphere.mesos.protos.FrameworkInfo
 import org.apache.mesos.Protos.CommandInfo.URI
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo
 import org.apache.mesos.Protos.Environment.Variable
@@ -13,7 +12,7 @@ import scala.collection.JavaConverters._
 
 
 case class Resources(cpus: Double, memory: Double, disk: Double) {
-  def canSatifsy(another: Resources) {
+  def canSatisfy(another: Resources): Boolean = {
     this.cpus >= another.cpus && this.memory >= another.memory && this.cpus >= another.memory
   }
 }
@@ -21,9 +20,9 @@ case class Resources(cpus: Double, memory: Double, disk: Double) {
 
 object Resources {
   def apply(task: GoTask): Resources =  {
-    new Resources(task.taskInfo.getOrElse("cpus", 1),
-    task.taskInfo.getOrElse("mem", 256),
-    task.taskInfo.getOrElse("disk", 0))
+    new Resources(task.resource.cpu,
+    task.resource.memory,
+    task.resource.disk)
   }
 
 
@@ -75,13 +74,13 @@ class GoCDScheduler(
     for (offer <- offers.asScala) {
       println(s"offer $offer")
       val nextTask = TaskQueue.dequeue
-      val task: GoTask = buildMesosTask(nextTask, offer)
+      val task: TaskInfo = buildMesosTask(nextTask, offer)
       if(task == null) {
         // return un used resources, as a good citizen
-        TaskQueue.enqueue(task)
-        driver.get().declineOffer(offer.getId)
+        TaskQueue.enqueue(nextTask)
+        driver.declineOffer(offer.getId)
       }
-      driver.launchTasks(List(offer.getId), List(task).asJava)
+      driver.launchTasks(List(offer.getId).asJava, List(task).asJava)
     }
   }
 
@@ -124,8 +123,7 @@ class GoCDScheduler(
         .addResources(Resource.newBuilder().setName("cpus").setScalar(Value.Scalar.newBuilder().setValue(needed.cpus)).build)
         .addResources(Resource.newBuilder().setName("mem").setScalar(Value.Scalar.newBuilder().setValue(needed.memory)).build)
         .setSlaveId(offer.getSlaveId)
-        .build
-      return task
+      return task.build()
     } else {
       return null
     }
@@ -142,7 +140,13 @@ class GoCDScheduler(
 
 object GoCDMesosFramework extends App {
   val config = new FrameworkConfig(ConfigFactory.load())
-  val framework = FrameworkInfo("GOCD-Mesos")
+  val framework = FrameworkInfo.newBuilder()
+    .setName("GOCD-Mesos")
+    .setUser("")
+    .setRole("*")
+    .setCheckpoint(false)
+    .setFailoverTimeout(0.0d)
+    .build()
   val poller = GOCDPoller(config.goMasterServer, config.goUserName, config.goPassword)
   val timeInterval = 1000;
   val runnable = new Runnable {
@@ -156,7 +160,7 @@ object GoCDMesosFramework extends App {
   val thread = new Thread(runnable);
   thread.start();
   val scheduler = new GoCDScheduler(config)
-  val driver = new MesosSchedulerDriver(scheduler, framework.toProto, config.mesosMaster)
+  val driver = new MesosSchedulerDriver(scheduler, framework, config.mesosMaster)
   driver.run();
 
 }
