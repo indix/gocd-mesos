@@ -13,8 +13,9 @@ import scala.collection.JavaConverters._
 
 class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
 
-  def envForGoCDTask = Environment.newBuilder()
-    .addVariables(Variable.newBuilder().setName("GOCD_SERVER").setValue(conf.mesosMaster).build())
+
+  lazy val envForGoCDTask = Environment.newBuilder()
+    .addVariables(Variable.newBuilder().setName("GOCD_SERVER").setValue(conf.goMasterServer).build())
     .addVariables(Variable.newBuilder().setName("REPO_USER").setValue(conf.goUserName).build())
     .addVariables(Variable.newBuilder().setName("REPO_PASSWD").setValue(conf.goPassword).build())
     .addVariables(Variable.newBuilder().setName("AGENT_PACKAGE_URL").setValue(conf.goAgentBinary).build())
