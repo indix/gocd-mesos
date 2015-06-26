@@ -114,7 +114,7 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
 object GoCDMesosFramework extends App {
   val config = new FrameworkConfig(ConfigFactory.load())
 
-  val id = "GOCD-Mesos" + System.currentTimeMillis()
+  val id = "GOCD-Mesos-" + System.currentTimeMillis()
 
 
   val frameworkInfo = FrameworkInfo.newBuilder()
@@ -139,7 +139,7 @@ object GoCDMesosFramework extends App {
 //  val thread = new Thread(runnable)
 //  thread.start()
   val scheduler = new GoCDScheduler(config)
-  val driver = new MesosSchedulerDriver(scheduler, frameworkInfo.build, config.mesosMaster)
+  val driver = new MesosSchedulerDriver(scheduler, frameworkInfo, config.mesosMaster)
   driver.run()
 
 }

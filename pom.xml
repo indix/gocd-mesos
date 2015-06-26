@@ -5,9 +5,6 @@
   <groupId>com.indix</groupId>
   <artifactId>gocd-mesos</artifactId>
   <version>0.1</version>
-  <inceptionYear>2015</inceptionYear>
-  <packaging>pom</packaging>
-
 
   <prerequisites>
     <maven>3.0</maven>
@@ -110,13 +107,6 @@
                        </goals>
                    </execution>
                </executions>
-               <configuration>
-                   <sourceDir>src/main/scala</sourceDir>
-                   <jvmArgs>
-                       <jvmArg>-Xms64m</jvmArg>
-                       <jvmArg>-Xmx1024m</jvmArg>
-                   </jvmArgs>
-               </configuration>
            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -160,6 +150,8 @@
                                     <goal>shade</goal>
                                 </goals>
                                 <configuration>
+                                    <shadedClassifierName>jar-with-dependencies</shadedClassifierName>
+                                    <shadedArtifactAttached>true</shadedArtifactAttached>
                                     <transformers>
                                         <transformer
                                                 implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
