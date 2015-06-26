@@ -48,13 +48,12 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     for (offer <- offers.asScala) {
       println(s"offer $offer")
       val nextTask = TaskQueue.dequeue
-      val task: TaskInfo = deployGoAgentTask(nextTask, offer)
-      if(task == null) {
-        // return unused resources, as a good citizen
-        TaskQueue.enqueue(nextTask)
-        driver.declineOffer(offer.getId)
-      }else {
-        driver.launchTasks(List(offer.getId).asJava, List(task).asJava)
+      val task = deployGoAgentTask(nextTask, offer)
+      task match {
+        case Some(t) => driver.launchTasks(List(offer.getId).asJava, List(t).asJava)
+        case None =>
+          TaskQueue.enqueue(nextTask)
+          driver.declineOffer(offer.getId)
       }
     }
   }
@@ -69,7 +68,7 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
       .build
   }
   
-  def deployGoAgentTask(goTask: GoTask, offer: Offer): TaskInfo =  {
+  def deployGoAgentTask(goTask: GoTask, offer: Offer) =  {
     val needed = Resources(goTask)
     val available = Resources(offer)
     if(available.canSatisfy(needed)) {
@@ -92,9 +91,9 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
         .addResources(resource("cpus", needed.cpus))
         .addResources(resource("mem", needed.memory))
         .setSlaveId(offer.getSlaveId)
-      return task.build()
+      Some(task.build())
     } else {
-      return null
+      None
     }
   }
 
