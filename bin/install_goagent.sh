@@ -5,21 +5,11 @@
 # Download Go agent from repo.indix.tv
 # rpm install go-agent-15.1.0
 #
-if [ $# -ne 1 ]; then
-	echo "Needs one argument. The go server to which this agent should talk to"
-	echo "Pl ensure the following env variables are exported in the shell this script is being run"
-	echo "REPO_USER => Indix repo user name"
-	echo "REPO_PASSWD => Indix repo password"
-	echo "AGENT_PACKAGE_URL => The rpm package url"
-	exit -1
-fi
-
-GOCD_SERVER=$1
-
 echo "# Following ENV Variables are needed for this script to work"
 echo "# REPO_USER"
 echo "# REPO_PASSWD"
 echo "# AGENT_PACKAGE_URL"
+echo "# GOCD_SERVER"
 
 AGENT_RPM=`echo ${AGENT_PACKAGE_URL} | awk -F"/" '{print $NF}'`
 
@@ -33,3 +23,6 @@ sudo sed -e "s#GO_SERVER=.*#GO_SERVER=${GOCD_SERVER}#g" -i /etc/default/go-agent
 
 echo "Starting Go agent"
 sudo /etc/init.d/go-agent restart
+
+echo "Registering go-agent against the GO Server"
+curl -u 'indix:1nd1x!@#$%' http://build.indix.tv:8080/
