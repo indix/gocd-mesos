@@ -13,10 +13,10 @@ echo "# GOCD_SERVER"
 
 AGENT_RPM=`echo ${AGENT_PACKAGE_URL} | awk -F"/" '{print $NF}'`
 
-curl -u ${REPO_USER}:${REPO_PASSWD} -O ${AGENT_PACKAGE_URL}
+wget ${AGENT_PACKAGE_URL}
 
 echo "Installing go agent ${AGENT_RPM}"
-sudo rpm -ivh ${AGENT_RPM}
+sudo dpkg -i ${AGENT_RPM}
 
 echo "Setting up agent to talk to Go server @ ${GOCD_SERVER}"
 sudo sed -e "s#GO_SERVER=.*#GO_SERVER=${GOCD_SERVER}#g" -i /etc/default/go-agent
@@ -39,4 +39,4 @@ echo "Listing All Go agents on the Server"
 curl -u 'indix:1nd1x!@#$%' http://build.indix.tv:8080/go/api/agents
 
 ## Debug stuff!
-read
+sleep 30*60*60
