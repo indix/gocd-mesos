@@ -43,7 +43,6 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
    *
    */
   override def resourceOffers(driver: SchedulerDriver, offers: java.util.List[Offer]) {
-
     //for every available offer run tasks
     for (offer <- offers.asScala) {
       println(s"offer $offer")
@@ -97,38 +96,46 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     }
   }
 
-  override def reregistered(driver: SchedulerDriver, masterInfo: MasterInfo) {}
+  override def reregistered(driver: SchedulerDriver, masterInfo: MasterInfo) {
+    println(s"RE-registered with mesos master.")
+  }
 
-  override def registered(driver: SchedulerDriver, frameworkId: FrameworkID, masterInfo: MasterInfo) {}
+  override def registered(driver: SchedulerDriver, frameworkId: FrameworkID, masterInfo: MasterInfo) {
+    println(s"registered with mesos master. Framework id is ${frameworkId.getValue}")
+  }
 
 }
 
 
 object GoCDMesosFramework extends App {
   val config = new FrameworkConfig(ConfigFactory.load())
-  val framework = FrameworkInfo.newBuilder()
+
+  val id = "GOCD-Mesos" + System.currentTimeMillis()
+
+
+  val frameworkInfo = FrameworkInfo.newBuilder()
+    .setId(FrameworkID.newBuilder().setValue(id).build())
     .setName("GOCD-Mesos")
     .setUser("")
     .setRole("*")
     .setCheckpoint(false)
     .setFailoverTimeout(0.0d)
     .build()
-
-  val poller = GOCDPoller(config.goMasterServer, config.goUserName, config.goPassword)
-  val timeInterval = 1000
-  val runnable = new Runnable {
-    override def run(): Unit = {
-      while(true) {
-        poller.pollAndAddTask()
-        Thread.sleep(timeInterval)
-      }
-    }
-  }
-
-  val thread = new Thread(runnable)
-  thread.start()
+//
+//  val poller = GOCDPoller(config.goMasterServer, config.goUserName, config.goPassword)
+//  val timeInterval = 1000
+//  val runnable = new Runnable {
+//    override def run(): Unit = {
+//      while(true) {
+//        poller.pollAndAddTask
+//        Thread.sleep(timeInterval)
+//      }
+//    }
+//  }
+//  val thread = new Thread(runnable)
+//  thread.start()
   val scheduler = new GoCDScheduler(config)
-  val driver = new MesosSchedulerDriver(scheduler, framework, config.mesosMaster)
+  val driver = new MesosSchedulerDriver(scheduler, frameworkInfo.build, config.mesosMaster)
   driver.run()
 
 }
