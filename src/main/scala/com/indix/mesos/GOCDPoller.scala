@@ -38,7 +38,7 @@ case class GOCDPoller(server: String, user: String, password: String) {
     
     if(responseHistory.size > 5) {
       println(s"More than 5 jobs pending in the GOCD. queuing a new agent launch now.")
-      TaskQueue.enqueue(GoTask("./install_go_agent.sh", "", "https://raw.githubusercontent.com/ind9/gocd-mesos/master/bin/install_goagent.sh"))
+      TaskQueue.enqueue(GoTask("sh install_goagent.sh", "", "https://raw.githubusercontent.com/ind9/gocd-mesos/master/bin/install_goagent.sh"))
       responseHistory.clear()
     }
   }

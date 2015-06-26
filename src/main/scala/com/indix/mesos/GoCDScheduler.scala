@@ -1,11 +1,10 @@
 package com.indix.mesos
 
 import com.typesafe.config.ConfigFactory
-import org.apache.mesos.Protos.CommandInfo.URI
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo
 import org.apache.mesos.Protos.Environment.Variable
 import org.apache.mesos.Protos._
-import org.apache.mesos.{Protos, MesosSchedulerDriver, Scheduler, SchedulerDriver}
+import org.apache.mesos.{MesosSchedulerDriver, Protos, Scheduler, SchedulerDriver}
 
 import scala.collection.JavaConverters._
 
@@ -92,8 +91,8 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
         .setCommand(
           CommandInfo
             .newBuilder()
+            .addUris(CommandInfo.URI.newBuilder().setValue(goTask.uri).setExecutable(true))
             .setValue(goTask.cmdString)
-            .addUris(URI.newBuilder().setValue(goTask.uri).build())
             .setEnvironment(envForGoCDTask)
             .build)
         .setName(id)
