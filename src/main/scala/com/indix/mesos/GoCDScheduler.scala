@@ -53,8 +53,9 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
         // return unused resources, as a good citizen
         TaskQueue.enqueue(nextTask)
         driver.declineOffer(offer.getId)
+      }else {
+        driver.launchTasks(List(offer.getId).asJava, List(task).asJava)
       }
-      driver.launchTasks(List(offer.getId).asJava, List(task).asJava)
     }
   }
 
@@ -119,11 +120,12 @@ object GoCDMesosFramework extends App {
   val runnable = new Runnable {
     override def run(): Unit = {
       while(true) {
-        poller.pollAndAddTask
+        poller.pollAndAddTask()
         Thread.sleep(timeInterval)
       }
     }
   }
+
   val thread = new Thread(runnable)
   thread.start()
   val scheduler = new GoCDScheduler(config)

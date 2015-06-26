@@ -12,7 +12,7 @@ case class GOCDPoller(server: String, user: String, password: String) {
   def goTaskQueueSize() = {
     val response: HttpResponse[String] = Http(server).header("Authorization", authToken).asString
     val responseXml = scala.xml.XML.loadString(response.body)
-    (responseXml \ "scheduled").size
+    (responseXml \ "scheduledJobs" \ "job").size
   }
 
   def goIdleAgentsCount() = {
