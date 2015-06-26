@@ -1,16 +1,18 @@
 package com.indix.mesos
 
+import com.google.common.io.BaseEncoding
+
 import scala.collection.mutable
 import scalaj.http._
 
 case class GOCDPoller(server: String, user: String, password: String) {
 
-  val authToken = Base64.encode(s"Basic $user:$password".getBytes).toString
+  val authToken = BaseEncoding.base64().encode(s"${user}:${password}".getBytes("UTF-8"));
 
-  var responseHistory: scala.collection.mutable.MutableList[Int] = mutable.MutableList.empty[Int]
+  val responseHistory: scala.collection.mutable.MutableList[Int] = mutable.MutableList.empty[Int]
 
   def goTaskQueueSize() = {
-    val response: HttpResponse[String] = Http(server).header("Authorization", authToken).asString
+    val response: HttpResponse[String] = Http(server + "go/api/jobs/scheduled.xml").header("Authorization", s"Basic ${authToken}").asString
     val responseXml = scala.xml.XML.loadString(response.body)
     (responseXml \ "scheduledJobs" \ "job").size
   }
