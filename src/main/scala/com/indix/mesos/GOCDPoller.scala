@@ -18,7 +18,7 @@ case class GOCDPoller(server: String, user: String, password: String) {
     try {
       val response: HttpResponse[String] = Http(server + "go/api/jobs/scheduled.xml").header("Authorization", s"Basic ${authToken}").asString
       val responseXml = scala.xml.XML.loadString(response.body)
-      return (responseXml \ "scheduled").size
+      return (responseXml \\ "scheduledJobs" \\ "job").size
     } catch {
       case e: SocketTimeoutException => {
         println("GOCD Server timed out!!")

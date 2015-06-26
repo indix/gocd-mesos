@@ -11,6 +11,7 @@ case class Resources(cpus: Double, memory: Double, disk: Double) {
 }
 object Resources {
   def apply(task: GoTask): Resources =  {
+    println(task.resource.cpu, task.resource.memory)
     new Resources(task.resource.cpu,
       task.resource.memory,
       task.resource.disk)

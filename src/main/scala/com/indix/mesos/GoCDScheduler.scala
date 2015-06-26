@@ -5,7 +5,7 @@ import org.apache.mesos.Protos.CommandInfo.URI
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo
 import org.apache.mesos.Protos.Environment.Variable
 import org.apache.mesos.Protos._
-import org.apache.mesos.{MesosSchedulerDriver, Scheduler, SchedulerDriver}
+import org.apache.mesos.{Protos, MesosSchedulerDriver, Scheduler, SchedulerDriver}
 
 import scala.collection.JavaConverters._
 
@@ -50,18 +50,30 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     for (offer <- offers.asScala) {
       println(s"offer $offer")
       val nextTask = TaskQueue.dequeue
-      val task = deployGoAgentTask(nextTask, offer)
-      task match {
-        case Some(t) => driver.launchTasks(List(offer.getId).asJava, List(t).asJava)
-        case None =>
-          TaskQueue.enqueue(nextTask)
-          driver.declineOffer(offer.getId)
+      if(nextTask != null) {
+        val task = deployGoAgentTask(nextTask, offer)
+        task match {
+          case Some(tt) => driver.launchTasks(List(offer.getId).asJava, List(tt).asJava)
+          case None => {
+            TaskQueue.enqueue(nextTask)
+            println(s"declining unused offer because offer is not enough")
+            driver.declineOffer(offer.getId)
+          }
+        }
+      }
+      else {
+        println(s"declining unused offer because there is no task")
+        driver.declineOffer(offer.getId)
       }
     }
   }
 
   def resource(name: String, value: Double) = {
-    Resource.newBuilder().setName(name).setScalar(Value.Scalar.newBuilder().setValue(value)).build
+    Resource.newBuilder()
+      .setType(Protos.Value.Type.SCALAR)
+      .setName(name)
+      .setScalar(Value.Scalar.newBuilder().setValue(value))
+      .build
   }
 
   def dockerContainer(image: String) = {
@@ -111,35 +123,35 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
 }
 
 
-object GoCDMesosFramework extends App {
-  val config = new FrameworkConfig(ConfigFactory.load())
+  object GoCDMesosFramework extends App {
+   val config = new FrameworkConfig(ConfigFactory.load())
 
-  val id = "GOCD-Mesos-" + System.currentTimeMillis()
+    val id = "GOCD-Mesos-" + System.currentTimeMillis()
 
 
-  val frameworkInfo = FrameworkInfo.newBuilder()
-    .setId(FrameworkID.newBuilder().setValue(id).build())
-    .setName("GOCD-Mesos")
-    .setUser("")
-    .setRole("*")
-    .setCheckpoint(false)
-    .setFailoverTimeout(0.0d)
-    .build()
-//
-//  val poller = GOCDPoller(config.goMasterServer, config.goUserName, config.goPassword)
-//  val timeInterval = 1000
-//  val runnable = new Runnable {
-//    override def run(): Unit = {
-//      while(true) {
-//        poller.pollAndAddTask
-//        Thread.sleep(timeInterval)
-//      }
-//    }
-//  }
-//  val thread = new Thread(runnable)
-//  thread.start()
-  val scheduler = new GoCDScheduler(config)
-  val driver = new MesosSchedulerDriver(scheduler, frameworkInfo, config.mesosMaster)
-  driver.run()
+    val frameworkInfo = FrameworkInfo.newBuilder()
+      .setId(FrameworkID.newBuilder().setValue(id).build())
+      .setName("GOCD-Mesos")
+      .setUser("")
+      .setRole("*")
+      .setCheckpoint(false)
+      .setFailoverTimeout(0.0d)
+      .build()
 
+  val poller = GOCDPoller(config.goMasterServer, config.goUserName, config.goPassword)
+  val timeInterval = 1000
+  val runnable = new Runnable {
+    override def run(): Unit = {
+      while(true) {
+        poller.pollAndAddTask
+        Thread.sleep(timeInterval)
+      }
+    }
+  }
+  val thread = new Thread(runnable)
+  thread.start()
+    val scheduler = new GoCDScheduler(config)
+    val driver = new MesosSchedulerDriver(scheduler, frameworkInfo, config.mesosMaster)
+    driver.run()
+    println("Started!!!")
 }
