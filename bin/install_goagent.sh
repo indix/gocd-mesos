@@ -21,8 +21,22 @@ sudo rpm -ivh ${AGENT_RPM}
 echo "Setting up agent to talk to Go server @ ${GOCD_SERVER}"
 sudo sed -e "s#GO_SERVER=.*#GO_SERVER=${GOCD_SERVER}#g" -i /etc/default/go-agent
 
+GUID_FILE="/var/lib/go-agent/config/guid.txt"
+echo "Setting guid for Agent"
+echo "$GUID" > ${GUID_FILE}
+
 echo "Starting Go agent"
 sudo /etc/init.d/go-agent restart
 
+is_go_running=`ps -aef | grep go-agent`
+echo "Checking to see if Go Agent is running"
+echo ${is_go_running}
+
 echo "Registering go-agent against the GO Server"
-curl -u 'indix:1nd1x!@#$%' http://build.indix.tv:8080/
+curl -u 'indix:1nd1x!@#$%' http://build.indix.tv:8080/go/api/agents/${GUID}/enable
+
+echo "Listing All Go agents on the Server"
+curl -u 'indix:1nd1x!@#$%' http://build.indix.tv:8080/go/api/agents
+
+## Debug stuff!
+read

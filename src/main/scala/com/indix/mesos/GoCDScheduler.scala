@@ -1,5 +1,7 @@
 package com.indix.mesos
 
+import java.util.UUID
+
 import com.typesafe.config.ConfigFactory
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo
 import org.apache.mesos.Protos.Environment.Variable
@@ -11,12 +13,11 @@ import scala.collection.JavaConverters._
 
 class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
 
-  lazy val envForGoCDTask = Environment.newBuilder()
+  def envForGoCDTask = Environment.newBuilder()
     .addVariables(Variable.newBuilder().setName("GOCD_SERVER").setValue(conf.mesosMaster).build())
     .addVariables(Variable.newBuilder().setName("REPO_USER").setValue(conf.goUserName).build())
     .addVariables(Variable.newBuilder().setName("REPO_PASSWD").setValue(conf.goPassword).build())
     .addVariables(Variable.newBuilder().setName("AGENT_PACKAGE_URL").setValue(conf.goAgentBinary).build())
-    .build
 
   override def error(driver: SchedulerDriver, message: String) {}
 
@@ -87,13 +88,14 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     val available = Resources(offer)
     if(available.canSatisfy(needed)) {
       val id = "task" + System.currentTimeMillis()
+      val taskProperties = envForGoCDTask.addVariables(Variable.newBuilder().setName("GUID").setValue(UUID.randomUUID().toString).build())
       val task = TaskInfo.newBuilder
         .setCommand(
           CommandInfo
             .newBuilder()
             .addUris(CommandInfo.URI.newBuilder().setValue(goTask.uri).setExecutable(true))
             .setValue(goTask.cmdString)
-            .setEnvironment(envForGoCDTask)
+            .setEnvironment(taskProperties)
             .build)
         .setName(id)
         .setTaskId(TaskID.newBuilder.setValue(id))
