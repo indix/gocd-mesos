@@ -27,7 +27,9 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
 
   override def slaveLost(driver: SchedulerDriver, slaveId: SlaveID) {}
 
-  override def disconnected(driver: SchedulerDriver) {}
+  override def disconnected(driver: SchedulerDriver): Unit = {
+    println(s"Received Disconnected message $driver")
+  }
 
   override def frameworkMessage(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]) {}
 
@@ -43,6 +45,7 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
    *
    */
   override def resourceOffers(driver: SchedulerDriver, offers: java.util.List[Offer]) {
+    println(s"Received resource offer size: ${offers.size()}")
     //for every available offer run tasks
     for (offer <- offers.asScala) {
       println(s"offer $offer")
@@ -60,6 +63,7 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
   def resource(name: String, value: Double) = {
     Resource.newBuilder().setName(name).setScalar(Value.Scalar.newBuilder().setValue(value)).build
   }
+
   def dockerContainer(image: String) = {
     ContainerInfo.newBuilder()
       .setType(ContainerInfo.Type.DOCKER)
