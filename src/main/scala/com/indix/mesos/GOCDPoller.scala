@@ -1,6 +1,6 @@
 package com.indix.mesos
 
-import java.net.SocketTimeoutException
+import java.net.{UnknownHostException, SocketTimeoutException}
 
 import com.google.common.io.BaseEncoding
 
@@ -16,12 +16,16 @@ case class GOCDPoller(server: String, user: String, password: String) {
   def goTaskQueueSize(): Int = {
     println("Polling GO Server for scheduled jobs")
     try {
-      val response: HttpResponse[String] = Http(server + "go/api/jobs/scheduled.xml").header("Authorization", s"Basic ${authToken}").asString
+      val response: HttpResponse[String] = Http(server + "go/api/jobs/scheduled.xml").asString //.header("Authorization", s"Basic ${authToken}").asString
       val responseXml = scala.xml.XML.loadString(response.body)
       return (responseXml \\ "scheduledJobs" \\ "job").size
     } catch {
       case e: SocketTimeoutException => {
         println("GOCD Server timed out!!")
+        return 0
+      }
+      case e: UnknownHostException => {
+        println("GOCD server throws unknownhost")
         return 0
       }
     }
@@ -38,8 +42,9 @@ case class GOCDPoller(server: String, user: String, password: String) {
     
     if(responseHistory.size > 5) {
       println(s"More than 5 jobs pending in the GOCD. queuing a new agent launch now.")
-      TaskQueue.enqueue(GoTask("sh install_goagent.sh", "", "https://raw.githubusercontent.com/ind9/gocd-mesos/master/bin/install_goagent.sh"))
+      TaskQueue.enqueue(GoTask(s"docker run -it -e GO_SERVER=$server travix/gocd-agent:latest", "gocd/gocd-agent", ""))
       responseHistory.clear()
+      Thread.sleep(1 * 60 * 1000)
     }
   }
 

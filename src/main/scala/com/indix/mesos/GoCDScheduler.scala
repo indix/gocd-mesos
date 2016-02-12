@@ -9,13 +9,16 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, Protos, Scheduler, SchedulerDriver}
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 
 class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
 
 
   lazy val envForGoCDTask = Environment.newBuilder()
-    .addVariables(Variable.newBuilder().setName("GOCD_SERVER").setValue(conf.goMasterServer).build())
+    .addVariables(Variable.newBuilder().setName("GO_SERVER").setValue("192.168.33.10").build())
     .addVariables(Variable.newBuilder().setName("REPO_USER").setValue(conf.goUserName).build())
     .addVariables(Variable.newBuilder().setName("REPO_PASSWD").setValue(conf.goPassword).build())
     .addVariables(Variable.newBuilder().setName("AGENT_PACKAGE_URL").setValue(conf.goAgentBinary).build())
@@ -89,21 +92,31 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     val available = Resources(offer)
     if(available.canSatisfy(needed)) {
       val id = "task" + System.currentTimeMillis()
+      val executorImage = "travix/gocd-agent:latest"
       val taskProperties = envForGoCDTask.addVariables(Variable.newBuilder().setName("GUID").setValue(UUID.randomUUID().toString).build())
+      val dockerExecutor = Protos.ContainerInfo.DockerInfo
+        .newBuilder()
+        .setImage(executorImage)
+        .setNetwork(Protos.ContainerInfo.DockerInfo.Network.BRIDGE)
+
+      val container = Protos.ContainerInfo.newBuilder()
+        .setType(Protos.ContainerInfo.Type.DOCKER)
+        .setDocker(dockerExecutor.build())
+
+      val executorInfo = Protos.ExecutorInfo.newBuilder()
+        .setExecutorId(ExecutorID.newBuilder().setValue("executor-" + id))
+        .setName("GOCD-Agent-Executor")
+        .setContainer(container)
+        .setCommand(Protos.CommandInfo.newBuilder()
+          .setEnvironment(Protos.Environment.newBuilder()
+            .addAllVariables(envForGoCDTask.getVariablesList))
+          .setShell(false))
+        .build()
+
       val task = TaskInfo.newBuilder
-        .setCommand(
-          CommandInfo
-            .newBuilder()
-            .addUris(CommandInfo.URI.newBuilder().setValue(goTask.uri).setExecutable(true))
-            .setValue(goTask.cmdString)
-            .setEnvironment(taskProperties)
-            .build)
-        .setName(id)
-        .setTaskId(TaskID.newBuilder.setValue(id))
-
-       if(goTask.dockerImage.nonEmpty)
-        task.setContainer(dockerContainer(goTask.dockerImage))
-
+           .setExecutor(executorInfo)
+           .setName(id)
+           .setTaskId(TaskID.newBuilder.setValue(id))
        task
         .addResources(resource("cpus", needed.cpus))
         .addResources(resource("mem", needed.memory))
@@ -131,29 +144,55 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     val id = "GOCD-Mesos-" + System.currentTimeMillis()
 
 
+    println(s"The Framework id is $id")
+
+
+    val poller = GOCDPoller(config.goMasterServer, config.goUserName, config.goPassword)
+    val timeInterval = 1000
+    val runnable = new Runnable {
+      override def run(): Unit = {
+        while(true) {
+          poller.pollAndAddTask
+          Thread.sleep(timeInterval)
+        }
+      }
+    }
+
     val frameworkInfo = FrameworkInfo.newBuilder()
       .setId(FrameworkID.newBuilder().setValue(id).build())
       .setName("GOCD-Mesos")
       .setUser("")
       .setRole("*")
-      .setCheckpoint(false)
-      .setFailoverTimeout(0.0d)
+      .setHostname("pattigai")
+      .setCheckpoint(true)
+      .setFailoverTimeout(60.seconds.toMillis)
       .build()
 
-  val poller = GOCDPoller(config.goMasterServer, config.goUserName, config.goPassword)
-  val timeInterval = 1000
-  val runnable = new Runnable {
-    override def run(): Unit = {
-      while(true) {
-        poller.pollAndAddTask
-        Thread.sleep(timeInterval)
-      }
-    }
-  }
-  val thread = new Thread(runnable)
-  thread.start()
+    val thread = new Thread(runnable)
+    thread.start()
     val scheduler = new GoCDScheduler(config)
     val driver = new MesosSchedulerDriver(scheduler, frameworkInfo, config.mesosMaster)
-    driver.run()
-    println("Started!!!")
+    println("Starting the driver")
+
+    val status = if(driver.run() == Status.DRIVER_STOPPED)  0 else 1
+
+    //driver.run }
+
+   // println(driver.join())
+
+    println(status)
+    // Ensure that the driver process terminates.
+    driver.stop();
+    // For this test to pass reliably on some platforms, this sleep is
+    // required to ensure that the SchedulerDriver teardown is complete
+    // before the JVM starts running native object destructors after
+    // System.exit() is called. 500ms proved successful in test runs,
+    // but on a heavily loaded machine it might not.
+    // TODO(greg): Ideally, we would inspect the status of the driver
+    // and its associated tasks via the Java API and wait until their
+    // teardown is complete to exit.
+    Thread.sleep(500);
+
+    System.exit(status);
+    println("===================================")
 }
