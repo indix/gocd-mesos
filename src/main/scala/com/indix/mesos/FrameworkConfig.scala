@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 
 class FrameworkConfig(config: Config) {
 
-    val rootConfig = config.atPath("gocd-mesos")
+    val rootConfig = config.getConfig("gocd-mesos")
 
     val mesosMaster = rootConfig.getString("mesos-master")
 

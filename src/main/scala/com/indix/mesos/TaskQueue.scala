@@ -16,5 +16,9 @@ object TaskQueue {
   def dequeue : GoTask = {
     queue.poll()
   }
+
+  def reset = {
+    queue.clear()
+  }
  }
 

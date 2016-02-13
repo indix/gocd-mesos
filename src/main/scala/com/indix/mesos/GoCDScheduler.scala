@@ -13,8 +13,6 @@ import scala.concurrent.duration._
 
 
 class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
-
-
   lazy val envForGoCDTask = Environment.newBuilder()
     .addVariables(Variable.newBuilder().setName("GO_SERVER").setValue(conf.goServerHost).build())
     .addVariables(Variable.newBuilder().setName("AGENT_KEY").setValue(conf.goAgentKey.getOrElse(UUID.randomUUID().toString)).build())
@@ -68,7 +66,7 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     }
   }
 
-  private def resource(name: String, value: Double) = {
+  private[mesos] def resource(name: String, value: Double) = {
     Resource.newBuilder()
       .setType(Protos.Value.Type.SCALAR)
       .setName(name)
@@ -76,20 +74,20 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
       .build
   }
 
-  private def dockerInfo(goTask: GoTask) = {
+  private[mesos] def dockerInfo(goTask: GoTask) = {
     Protos.ContainerInfo.DockerInfo
       .newBuilder()
       .setImage(goTask.dockerImage)
       .setNetwork(DockerInfo.Network.BRIDGE)
   }
 
-  private def dockerContainerInfo(goTask: GoTask) = {
+  private[mesos] def dockerContainerInfo(goTask: GoTask) = {
     Protos.ContainerInfo.newBuilder()
       .setType(Protos.ContainerInfo.Type.DOCKER)
       .setDocker(dockerInfo(goTask).build())
   }
 
-  private def executorInfo(goTask: GoTask, currentTimeStamp: Long) = {
+  private[mesos] def executorInfo(goTask: GoTask, currentTimeStamp: Long) = {
    Protos.ExecutorInfo.newBuilder()
       .setExecutorId(ExecutorID.newBuilder().setValue("gocd-agent-executor-" + currentTimeStamp))
       .setName("GOCD-Agent-Executor")
