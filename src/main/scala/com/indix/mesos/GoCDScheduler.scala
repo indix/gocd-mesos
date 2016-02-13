@@ -142,7 +142,7 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
 
 
     val poller = GOCDPoller(config)
-    val timeInterval = 1000
+    val timeInterval = 2 * 60 * 1000
     val runnable = new Runnable {
       override def run(): Unit = {
         while(true) {

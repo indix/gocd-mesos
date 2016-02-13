@@ -40,7 +40,6 @@ case class GOCDPoller(conf: FrameworkConfig) {
       println(s"More than 5 jobs pending in the GOCD. queuing a new agent launch now.")
       TaskQueue.enqueue(GoTask("", conf.goAgentDocker, ""))
       responseHistory.clear()
-      Thread.sleep(1 * 60 * 1000)
     }
   }
 
