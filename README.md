@@ -1,7 +1,7 @@
+[![Build Status](https://snap-ci.com/ind9/gocd-mesos/branch/master/build_image)](https://snap-ci.com/ind9/gocd-mesos/branch/master)
+
 GoCD Mesos
 ==========
-
-
 > Autoscale GO agents with mesos!
 
 GoCD Mesos is a mesos framework, that can autoscale go agents on top of a mesos cluster based on the job backlog in the GoCD server. GoCD Mesos uses the GoCD API to calculate the backlog and figure out the agent demand.
