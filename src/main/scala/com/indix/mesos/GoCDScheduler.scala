@@ -3,25 +3,19 @@ package com.indix.mesos
 import java.util.UUID
 
 import com.typesafe.config.ConfigFactory
-import org.apache.mesos.Protos.ContainerInfo.DockerInfo
 import org.apache.mesos.Protos.Environment.Variable
 import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, Protos, Scheduler, SchedulerDriver}
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.Implicits.global
 
 
 class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
 
 
   lazy val envForGoCDTask = Environment.newBuilder()
-    .addVariables(Variable.newBuilder().setName("GO_SERVER").setValue("192.168.33.10").build())
-    .addVariables(Variable.newBuilder().setName("REPO_USER").setValue(conf.goUserName).build())
-    .addVariables(Variable.newBuilder().setName("REPO_PASSWD").setValue(conf.goPassword).build())
-    .addVariables(Variable.newBuilder().setName("AGENT_PACKAGE_URL").setValue(conf.goAgentBinary).build())
+    .addVariables(Variable.newBuilder().setName("GO_SERVER").setValue(conf.goServerHost).build())
 
   override def error(driver: SchedulerDriver, message: String) {}
 
@@ -80,23 +74,17 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
       .build
   }
 
-  def dockerContainer(image: String) = {
-    ContainerInfo.newBuilder()
-      .setType(ContainerInfo.Type.DOCKER)
-      .setDocker(DockerInfo.newBuilder().setImage(image).build)
-      .build
-  }
   
   def deployGoAgentTask(goTask: GoTask, offer: Offer) =  {
     val needed = Resources(goTask)
     val available = Resources(offer)
     if(available.canSatisfy(needed)) {
       val id = "task" + System.currentTimeMillis()
-      val executorImage = "travix/gocd-agent:latest"
+      val executorImage = conf.goAgentDocker
       val taskProperties = envForGoCDTask.addVariables(Variable.newBuilder().setName("GUID").setValue(UUID.randomUUID().toString).build())
       val dockerExecutor = Protos.ContainerInfo.DockerInfo
         .newBuilder()
-        .setImage(executorImage)
+        .setImage(goTask.dockerImage)
         .setNetwork(Protos.ContainerInfo.DockerInfo.Network.BRIDGE)
 
       val container = Protos.ContainerInfo.newBuilder()
@@ -147,7 +135,7 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     println(s"The Framework id is $id")
 
 
-    val poller = GOCDPoller(config.goMasterServer, config.goUserName, config.goPassword)
+    val poller = GOCDPoller(config)
     val timeInterval = 1000
     val runnable = new Runnable {
       override def run(): Unit = {
