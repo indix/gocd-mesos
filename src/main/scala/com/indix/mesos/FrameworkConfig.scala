@@ -3,18 +3,19 @@ package com.indix.mesos
 import com.typesafe.config.Config
 
 class FrameworkConfig(config: Config) {
-    val mesosMaster = config.getString("mesos-master")
 
-    val goMasterDocker = config.getString("go-master-docker")
+    val rootConfig = config.getConfig("gocd-mesos")
 
-    val goAgentDocker = config.getString("go-agent-docker")
+    val mesosMaster = rootConfig.getString("mesos-master")
 
-    val goMasterServer = config.getString("go-master-server")
+    val goAgentDocker = rootConfig.getString("go-agent.docker-image")
 
-    val goUserName = config.getString("go-user-name")
-    val goPassword = config.getString("go-password")
+    val goServerHost = rootConfig.getString("go-server.host")
 
-    val goAgentBinary = config.getString("go-agent-binary")
-    val repoUserName = config.getString("repo-user-name")
-    val repoPassword = config.getString("repo-password")
+    val goServerPort = rootConfig.getString("go-server.port")
+
+    val goUserName = rootConfig.getString("go-server.user-name")
+    val goPassword = rootConfig.getString("go-server.password")
+
+    val goAgentKey = if(rootConfig.hasPath("go-agent.auto-register-key")) Some(rootConfig.getString("go-agent.auto-register-key")) else None
 }
