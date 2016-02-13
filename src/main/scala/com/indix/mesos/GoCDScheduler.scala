@@ -3,6 +3,7 @@ package com.indix.mesos
 import java.util.UUID
 
 import com.typesafe.config.ConfigFactory
+import org.apache.mesos.Protos.ContainerInfo.DockerInfo
 import org.apache.mesos.Protos.Environment.Variable
 import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, Protos, Scheduler, SchedulerDriver}
@@ -16,6 +17,7 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
 
   lazy val envForGoCDTask = Environment.newBuilder()
     .addVariables(Variable.newBuilder().setName("GO_SERVER").setValue(conf.goServerHost).build())
+    .addVariables(Variable.newBuilder().setName("AGENT_KEY").setValue(conf.goAgentKey.getOrElse(UUID.randomUUID().toString)).build())
 
   override def error(driver: SchedulerDriver, message: String) {}
 
@@ -66,7 +68,7 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     }
   }
 
-  def resource(name: String, value: Double) = {
+  private def resource(name: String, value: Double) = {
     Resource.newBuilder()
       .setType(Protos.Value.Type.SCALAR)
       .setName(name)
@@ -74,37 +76,41 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
       .build
   }
 
+  private def dockerInfo(goTask: GoTask) = {
+    Protos.ContainerInfo.DockerInfo
+      .newBuilder()
+      .setImage(goTask.dockerImage)
+      .setNetwork(DockerInfo.Network.BRIDGE)
+  }
+
+  private def dockerContainerInfo(goTask: GoTask) = {
+    Protos.ContainerInfo.newBuilder()
+      .setType(Protos.ContainerInfo.Type.DOCKER)
+      .setDocker(dockerInfo(goTask).build())
+  }
+
+  private def executorInfo(goTask: GoTask, currentTimeStamp: Long) = {
+   Protos.ExecutorInfo.newBuilder()
+      .setExecutorId(ExecutorID.newBuilder().setValue("gocd-agent-executor-" + currentTimeStamp))
+      .setName("GOCD-Agent-Executor")
+      .setContainer(dockerContainerInfo(goTask).build())
+      .setCommand(Protos.CommandInfo.newBuilder()
+        .setEnvironment(Protos.Environment.newBuilder()
+          .addAllVariables(envForGoCDTask.getVariablesList))
+        .setShell(false))
+  }
+
   
   def deployGoAgentTask(goTask: GoTask, offer: Offer) =  {
     val needed = Resources(goTask)
     val available = Resources(offer)
     if(available.canSatisfy(needed)) {
-      val id = "task" + System.currentTimeMillis()
-      val executorImage = conf.goAgentDocker
-      val taskProperties = envForGoCDTask.addVariables(Variable.newBuilder().setName("GUID").setValue(UUID.randomUUID().toString).build())
-      val dockerExecutor = Protos.ContainerInfo.DockerInfo
-        .newBuilder()
-        .setImage(goTask.dockerImage)
-        .setNetwork(Protos.ContainerInfo.DockerInfo.Network.BRIDGE)
-
-      val container = Protos.ContainerInfo.newBuilder()
-        .setType(Protos.ContainerInfo.Type.DOCKER)
-        .setDocker(dockerExecutor.build())
-
-      val executorInfo = Protos.ExecutorInfo.newBuilder()
-        .setExecutorId(ExecutorID.newBuilder().setValue("executor-" + id))
-        .setName("GOCD-Agent-Executor")
-        .setContainer(container)
-        .setCommand(Protos.CommandInfo.newBuilder()
-          .setEnvironment(Protos.Environment.newBuilder()
-            .addAllVariables(envForGoCDTask.getVariablesList))
-          .setShell(false))
-        .build()
-
+      val currentTimeStamp = System.currentTimeMillis()
+      val taskId = "gocd-agent-task-" + currentTimeStamp
       val task = TaskInfo.newBuilder
-           .setExecutor(executorInfo)
-           .setName(id)
-           .setTaskId(TaskID.newBuilder.setValue(id))
+           .setExecutor(executorInfo(goTask, currentTimeStamp).build())
+           .setName(taskId)
+           .setTaskId(TaskID.newBuilder.setValue(taskId))
        task
         .addResources(resource("cpus", needed.cpus))
         .addResources(resource("mem", needed.memory))

@@ -18,18 +18,14 @@ case class GOCDPoller(conf: FrameworkConfig) {
     try {
       val response: HttpResponse[String] = Http(s"http://${conf.goServerHost}:${conf.goServerPort}" + "/go/api/jobs/scheduled.xml").asString //.header("Authorization", s"Basic ${authToken}").asString
       val responseXml = scala.xml.XML.loadString(response.body)
-      return (responseXml \\ "scheduledJobs" \\ "job").size
+      (responseXml \\ "scheduledJobs" \\ "job").size
     } catch {
       case e: SocketTimeoutException => {
         println("GOCD Server timed out!!")
-        return 0
-      }
-      case e: UnknownHostException => {
-        println("GOCD server throws unknownhost")
-        return 0
+        0
       }
     }
-  }e
+  }
 
   def goIdleAgentsCount() = {
   }

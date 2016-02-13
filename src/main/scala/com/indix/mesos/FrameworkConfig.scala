@@ -13,4 +13,6 @@ class FrameworkConfig(config: Config) {
 
     val goUserName = config.getString("go-user-name")
     val goPassword = config.getString("go-password")
+
+    val goAgentKey = if(config.hasPath("go-agent-key")) Some(config.getString("go-agent-key")) else None
 }
