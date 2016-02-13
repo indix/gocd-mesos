@@ -7,7 +7,7 @@ import org.apache.mesos.Protos.{Resource, Offer}
 import org.scalatest.{Matchers, FlatSpec}
 
 
-class GoCDSchedulerTest extends FlatSpec with Matchers {
+class GoCDSchedulerSpec extends FlatSpec with Matchers {
   val scheduler = new GoCDScheduler(new FrameworkConfig(ConfigFactory.load()))
 
   def generoursResourceOffer: Offer = {

@@ -4,7 +4,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest._
 import org.mockito.Mockito._
 
-class GoCDPollerTest extends FlatSpec with Matchers with BeforeAndAfterEach {
+class GoCDPollerSpec extends FlatSpec with Matchers with BeforeAndAfterEach {
 
 
   val poller = new GOCDPoller(new FrameworkConfig(ConfigFactory.load()))
