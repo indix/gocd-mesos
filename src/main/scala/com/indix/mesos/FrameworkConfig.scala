@@ -14,8 +14,8 @@ class FrameworkConfig(config: Config) {
 
     val goServerPort = rootConfig.getString("go-server.port")
 
-    val goUserName = rootConfig.getString("go-server.user-name")
-    val goPassword = rootConfig.getString("go-server.password")
+    lazy val goUserName = rootConfig.getString("go-server.user-name")
+    lazy val goPassword = rootConfig.getString("go-server.password")
 
     val goAuthEnabled = if(rootConfig.hasPath("go-server.auth-enabled")) rootConfig.getBoolean("go-server.auth-enabled") else false
 

@@ -43,6 +43,8 @@ gocd-mesos {
     port: "8080"
     user-name: "random-guy"
     password: "random-insecure-string"
+    # Enable if the go server mandatorily requires user name and password
+    auth-enabled: false
   }
 
   go-agent {
