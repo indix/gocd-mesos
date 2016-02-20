@@ -17,5 +17,7 @@ class FrameworkConfig(config: Config) {
     val goUserName = rootConfig.getString("go-server.user-name")
     val goPassword = rootConfig.getString("go-server.password")
 
+    val goAuthEnabled = if(rootConfig.hasPath("go-server.auth-enabled")) rootConfig.getBoolean("go-server.auth-enabled") else false
+
     val goAgentKey = if(rootConfig.hasPath("go-agent.auto-register-key")) Some(rootConfig.getString("go-agent.auto-register-key")) else None
 }
