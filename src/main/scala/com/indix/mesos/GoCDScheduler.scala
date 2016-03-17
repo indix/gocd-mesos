@@ -29,10 +29,13 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     println(s"Received Disconnected message $driver")
   }
 
-  override def frameworkMessage(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]) {}
+  override def frameworkMessage(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]): Unit = {
+
+  }
 
   override def statusUpdate(driver: SchedulerDriver, status: TaskStatus) {
     println(s"received status update $status")
+    TaskQueue.updateState(status.getTaskId.getValue, status.getState)
   }
 
   override def offerRescinded(driver: SchedulerDriver, offerId: OfferID) {}
@@ -47,21 +50,18 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     //for every available offer run tasks
     for (offer <- offers.asScala) {
       println(s"offer $offer")
-      val nextTask = TaskQueue.dequeue
-      if(nextTask != null) {
-        val task = deployGoAgentTask(nextTask, offer)
-        task match {
-          case Some(tt) => driver.launchTasks(List(offer.getId).asJava, List(tt).asJava)
+      TaskQueue.findNext.foreach { goTask =>
+        val mesosTask = deployGoAgentTask(goTask, offer)
+        mesosTask match {
+          case Some(tt) => {
+            driver.launchTasks(List(offer.getId).asJava, List(tt).asJava)
+            TaskQueue.add(goTask.copy(state = GoTaskState.Scheduled))
+          }
           case None => {
-            TaskQueue.enqueue(nextTask)
             println(s"declining unused offer because offer is not enough")
             driver.declineOffer(offer.getId)
           }
         }
-      }
-      else {
-        println(s"declining unused offer because there is no task")
-        driver.declineOffer(offer.getId)
       }
     }
   }
@@ -94,7 +94,13 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
       .setContainer(dockerContainerInfo(goTask).build())
       .setCommand(Protos.CommandInfo.newBuilder()
         .setEnvironment(Protos.Environment.newBuilder()
-          .addAllVariables(envForGoCDTask.getVariablesList))
+          .addAllVariables(envForGoCDTask
+            .addVariables(Variable
+              .newBuilder()
+              .setName("GO_AGENT_UUID")
+              .setValue(goTask.goAgentUuid)
+              .build())
+            .getVariablesList))
         .setShell(false))
   }
 
@@ -104,7 +110,7 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     val available = Resources(offer)
     if(available.canSatisfy(needed)) {
       val currentTimeStamp = System.currentTimeMillis()
-      val taskId = "gocd-agent-task-" + currentTimeStamp
+      val taskId = goTask.mesosTaskId
       val task = TaskInfo.newBuilder
            .setExecutor(executorInfo(goTask, currentTimeStamp).build())
            .setName(taskId)
@@ -126,7 +132,6 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
   override def registered(driver: SchedulerDriver, frameworkId: FrameworkID, masterInfo: MasterInfo) {
     println(s"registered with mesos master. Framework id is ${frameworkId.getValue}")
   }
-
 }
 
 
@@ -139,16 +144,11 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     println(s"The Framework id is $id")
 
 
+    val goTaskQueue = TaskQueue()
+
     val poller = GOCDPoller(config)
-    val timeInterval = 2 * 60 * 1000
-    val runnable = new Runnable {
-      override def run(): Unit = {
-        while(true) {
-          poller.pollAndAddTask
-          Thread.sleep(timeInterval)
-        }
-      }
-    }
+   // val timeInterval = 2 * 60 * 1000
+
 
     val frameworkInfo = FrameworkInfo.newBuilder()
       .setId(FrameworkID.newBuilder().setValue(id).build())
@@ -160,21 +160,11 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
       .setFailoverTimeout(60.seconds.toMillis)
       .build()
 
-    val thread = new Thread(runnable)
-    thread.start()
     val scheduler = new GoCDScheduler(config)
     val driver = new MesosSchedulerDriver(scheduler, frameworkInfo, config.mesosMaster)
     println("Starting the driver")
-
-    val status = if(driver.run() == Status.DRIVER_STOPPED)  0 else 1
-
-    //driver.run }
-
-   // println(driver.join())
-
-    println(status)
     // Ensure that the driver process terminates.
-    driver.stop();
+    driver.stop()
     // For this test to pass reliably on some platforms, this sleep is
     // required to ensure that the SchedulerDriver teardown is complete
     // before the JVM starts running native object destructors after
@@ -183,8 +173,5 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     // TODO(greg): Ideally, we would inspect the status of the driver
     // and its associated tasks via the Java API and wait until their
     // teardown is complete to exit.
-    Thread.sleep(500);
-
-    System.exit(status);
-    println("===================================")
-}
+    Thread.sleep(500)
+  }

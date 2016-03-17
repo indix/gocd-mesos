@@ -14,6 +14,10 @@ class FrameworkConfig(config: Config) {
 
     val goServerPort = rootConfig.getString("go-server.port")
 
+    val goMinAgents = rootConfig.getInt("go-agent.min-agents")
+
+    val goMaxAgents = rootConfig.getInt("go-agent.max-agents")
+
     lazy val goUserName = rootConfig.getString("go-server.user-name")
     lazy val goPassword = rootConfig.getString("go-server.password")
 
