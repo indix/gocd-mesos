@@ -1,17 +1,15 @@
 package com.indix.mesos
 
+import com.indix.mesos.common.GocdMesosLogger
 import org.apache.mesos.MesosSchedulerDriver
 import org.apache.mesos.Protos.{TaskState, TaskID, TaskStatus}
 import scala.collection.JavaConverters._
 
 
-case class GOCDScalar(conf: FrameworkConfig, poller: GOCDPoller, driver: MesosSchedulerDriver) {
-
-
-  def runningTaskIds = TaskQueue.getAllJobIds
-
+case class GOCDScalar(conf: FrameworkConfig, poller: GOCDPoller, driver: MesosSchedulerDriver) extends GocdMesosLogger {
 
   def reconcileTasks() = {
+    logger.info("Going to reconcile tasks now")
     val runningTasks = runningTaskIds.map(id => TaskStatus
       .newBuilder()
       .setTaskId(TaskID
@@ -20,18 +18,28 @@ case class GOCDScalar(conf: FrameworkConfig, poller: GOCDPoller, driver: MesosSc
         .build())
       .setState(TaskState.TASK_RUNNING)
       .build())
+    logger.info(s"There are ${runningTasks.size} tasks that need to reconciled")
     driver.reconcileTasks(runningTasks.asJavaCollection)
   }
 
   def scale() = {
+    logger.info("SCALAR going to do autoscale operation")
     val supply = getSupply
     val demand = getDemand
     if(demand > supply) {
+      logger.info(s"The demand: $demand is greater than supply: $supply. Now computing the agents needed according to min and max agents.")
       val needed = computeScaleup(supply, demand, conf.goMaxAgents, conf.goMinAgents)
-      scaleUp(needed)
+      if(needed > 0) {
+        logger.info(s"Adding $needed more agents to the fleet.")
+        scaleUp(needed)
+      }
     } else if (demand < supply) {
+      logger.info(s"The demand: $demand is less than supply: $supply. Now computing the agents not needed according to min and max agents.")
       val notNeeded = computeScaledown(supply, demand, conf.goMaxAgents, conf.goMinAgents)
-      scaleDown(notNeeded)
+      if(notNeeded > 0) {
+        logger.info(s"Removing $notNeeded agents from the fleet.")
+        scaleDown(notNeeded)
+      }
     }
   }
 
@@ -40,41 +48,48 @@ case class GOCDScalar(conf: FrameworkConfig, poller: GOCDPoller, driver: MesosSc
     scale()
   }
 
-  def getTotalAgents = {
+  private[mesos] def runningTaskIds = runningTasks.map(_.goAgentUuid)
+
+  private[mesos] def runningTasks = TaskQueue.getRunningTasks
+
+  private[mesos] def pendingTasks = TaskQueue.getPendingTasks
+
+
+  private[mesos] def getTotalAgents = {
     poller.getAllAgents.size
   }
 
-  def getSupply = {
+  private[mesos] def getSupply = {
     // Supply is number of 'idle GoAgents that are launched via Mesos' + 'GoAgents that are waiting to be launched'
-    TaskQueue
-      .getRunningJobs
+    val running = runningTasks
       .toList
       .map(_.goAgentUuid)
-      .union(poller.getIdleAgents.map(_.id)).size
-    + TaskQueue.getPendingJobs.size
+      .intersect(poller.getIdleAgents.map(_.id)).size
+    val pending = pendingTasks.size
+    running + pending
   }
 
-  def getDemand = {
+  private[mesos] def getDemand = {
     // Demand is number of 'jobs pending in Go Server'  + 'agents in building state'
     poller.getPendingJobsCount + poller.getBuildingAgents.size
   }
 
-  def scaleDown(agentCount: Int) = {
+  private[mesos] def scaleDown(agentCount: Int) = {
     val idleAgents = poller.getIdleAgents
     idleAgents.take(agentCount).foreach(agent => {
-      TaskQueue.getRunningJobs.toList.find(_.goAgentUuid == agent.id).foreach { task =>
+      TaskQueue.getRunningTasks.toList.find(_.goAgentUuid == agent.id).foreach { task =>
         driver.killTask(TaskID.newBuilder().setValue(task.mesosTaskId).build())
       }
     })
   }
 
-  def scaleUp(agentCount: Int) = {
+  private[mesos] def scaleUp(agentCount: Int) = {
     for(_ <- 0 to agentCount) {
       TaskQueue.add(GoTask(conf.goAgentDocker))
     }
   }
 
-  def computeScaleup(supply: Int, demand: Int, goMaxAgents: Int, goMinAgents: Int): Int = {
+  private[mesos] def computeScaleup(supply: Int, demand: Int, goMaxAgents: Int, goMinAgents: Int): Int = {
     assert(demand > supply)
     if(supply > goMaxAgents) {
       return 0
@@ -88,7 +103,7 @@ case class GOCDScalar(conf: FrameworkConfig, poller: GOCDPoller, driver: MesosSc
   }
 
 
-  def computeScaledown(supply: Int, demand: Int, goMaxAgents: Int, goMinAgents: Int): Int = {
+  private[mesos] def computeScaledown(supply: Int, demand: Int, goMaxAgents: Int, goMinAgents: Int): Int = {
     assert(supply > demand)
     if(supply < goMinAgents) {
       return 0

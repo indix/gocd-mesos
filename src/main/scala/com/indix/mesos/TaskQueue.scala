@@ -47,7 +47,7 @@ object GoTask {
 
 private[mesos] case class TaskQueue(queue: Map[String, GoTask] = Map.empty[String, GoTask]) {
 
-  def getRunningJobs = {
+  def getRunningTasks = {
     queue.values.filter { task: GoTask =>
       task.state match {
         case GoTaskState.Running => true
@@ -56,11 +56,11 @@ private[mesos] case class TaskQueue(queue: Map[String, GoTask] = Map.empty[Strin
     }
   }
 
-  def getPendingJobs = {
+  def getPendingTasks = {
     queue.values.filter { task: GoTask =>
       task.state match {
         case GoTaskState.Pending => true
-        case GoTaskState.Scheduled=> true
+        case GoTaskState.Scheduled => true
         case _ => false
       }
     }
@@ -105,9 +105,9 @@ object TaskQueue {
 
   def getAllJobIds = queue.queue.keys.toList
 
-  def getRunningJobs = queue.getRunningJobs
+  def getRunningTasks = queue.getRunningTasks
 
-  def getPendingJobs = queue.getPendingJobs
+  def getPendingTasks = queue.getPendingTasks
 
 
   def add(task : GoTask) {
