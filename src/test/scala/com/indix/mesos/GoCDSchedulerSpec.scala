@@ -51,11 +51,11 @@ class GoCDSchedulerSpec extends FlatSpec with Matchers {
   }
 
   "GoCDScheduler#deployGoAgentTask" should "refuse offer if there are not enough resources" in {
-    scheduler.deployGoAgentTask(GoTask("", "docker-image", ""), inadequateOffer) should be(None)
+    scheduler.deployGoAgentTask(GoTask("docker-image"), inadequateOffer) should be(None)
   }
 
   "GOCDScheduler#deployGoAgentTask" should "accept offer if there are enough resources" in {
-    val taskOpt = scheduler.deployGoAgentTask(GoTask("", "docker-image",""), generoursResourceOffer)
+    val taskOpt = scheduler.deployGoAgentTask(GoTask("docker-image"), generoursResourceOffer)
     taskOpt.isDefined should be(true)
     taskOpt.get.getExecutor.getContainer.getDocker.getImage should be("docker-image")
   }
