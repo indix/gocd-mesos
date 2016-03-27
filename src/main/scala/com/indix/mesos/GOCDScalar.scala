@@ -23,25 +23,44 @@ case class GOCDScalar(conf: FrameworkConfig, poller: GOCDPoller, driver: MesosSc
     driver.reconcileTasks(runningTasks.asJavaCollection)
   }
 
+  def scale() = {
+    val supply = getSupply
+    val demand = getDemand
+    if(demand > supply) {
+      val needed = computeScaleup(supply, demand, conf.goMaxAgents, conf.goMinAgents)
+      scaleUp(needed)
+    } else if (demand < supply) {
+      val notNeeded = computeScaledown(supply, demand, conf.goMaxAgents, conf.goMinAgents)
+      scaleDown(notNeeded)
+    }
+  }
+
+  def reconcileAndScale() = {
+    reconcileTasks()
+    scale()
+  }
+
   def getTotalAgents = {
-    poller.getGoAgents.size
+    poller.getAllAgents.size
   }
 
   def getSupply = {
+    // Supply is number of 'idle GoAgents that are launched via Mesos' + 'GoAgents that are waiting to be launched'
     TaskQueue
       .getRunningJobs
       .toList
       .map(_.goAgentUuid)
-      .union(poller.goIdleAgents.map(_.id)).size
+      .union(poller.getIdleAgents.map(_.id)).size
     + TaskQueue.getPendingJobs.size
   }
 
   def getDemand = {
+    // Demand is number of 'jobs pending in Go Server'  + 'agents in building state'
     poller.getPendingJobsCount + poller.getBuildingAgents.size
   }
 
   def scaleDown(agentCount: Int) = {
-    val idleAgents = poller.goIdleAgents
+    val idleAgents = poller.getIdleAgents
     idleAgents.take(agentCount).foreach(agent => {
       TaskQueue.getRunningJobs.toList.find(_.goAgentUuid == agent.id).foreach { task =>
         driver.killTask(TaskID.newBuilder().setValue(task.mesosTaskId).build())
@@ -57,6 +76,9 @@ case class GOCDScalar(conf: FrameworkConfig, poller: GOCDPoller, driver: MesosSc
 
   def computeScaleup(supply: Int, demand: Int, goMaxAgents: Int, goMinAgents: Int): Int = {
     assert(demand > supply)
+    if(supply > goMaxAgents) {
+      return 0
+    }
     val needed = demand - supply
     if(supply + needed > goMaxAgents) {
       goMaxAgents - supply
@@ -68,6 +90,9 @@ case class GOCDScalar(conf: FrameworkConfig, poller: GOCDPoller, driver: MesosSc
 
   def computeScaledown(supply: Int, demand: Int, goMaxAgents: Int, goMinAgents: Int): Int = {
     assert(supply > demand)
+    if(supply < goMinAgents) {
+      return 0
+    }
     val notNeeded = supply - demand
     if(supply - notNeeded < goMinAgents) {
       supply - goMinAgents
@@ -78,16 +103,4 @@ case class GOCDScalar(conf: FrameworkConfig, poller: GOCDPoller, driver: MesosSc
     }
   }
 
-
-  def scale = {
-    val supply = getSupply
-    val demand = getDemand
-    if(demand > supply) {
-      computeScaleup(supply, demand, conf.goMaxAgents, conf.goMinAgents)
-    } else if (demand < supply) {
-      computeScaledown(supply, demand, conf.goMaxAgents, conf.goMinAgents)
-    } else {
-      // do Nothing
-    }
-  }
 }

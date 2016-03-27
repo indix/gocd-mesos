@@ -2,6 +2,7 @@ package com.indix.mesos
 
 import java.util.UUID
 
+import com.indix.mesos.common.GocdMesosLogger
 import com.typesafe.config.ConfigFactory
 import org.apache.mesos.Protos.ContainerInfo.DockerInfo
 import org.apache.mesos.Protos.Environment.Variable
@@ -9,10 +10,11 @@ import org.apache.mesos.Protos._
 import org.apache.mesos.{MesosSchedulerDriver, Protos, Scheduler, SchedulerDriver}
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 
-class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
+class GoCDScheduler(conf : FrameworkConfig) extends Scheduler with GocdMesosLogger {
   lazy val envForGoCDTask = Environment.newBuilder()
     .addVariables(Variable.newBuilder().setName("GO_SERVER").setValue(conf.goServerHost).build())
     .addVariables(Variable.newBuilder().setName("AGENT_KEY").setValue(conf.goAgentKey.getOrElse(UUID.randomUUID().toString)).build())
@@ -20,13 +22,13 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
   override def error(driver: SchedulerDriver, message: String) {}
 
   override def executorLost(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, status: Int) {
-    println(s"executor completed execution with status: $status")
+    logger.info(s"executor completed execution with status: $status")
   }
 
   override def slaveLost(driver: SchedulerDriver, slaveId: SlaveID) {}
 
   override def disconnected(driver: SchedulerDriver): Unit = {
-    println(s"Received Disconnected message $driver")
+    logger.info(s"Received Disconnected message $driver")
   }
 
   override def frameworkMessage(driver: SchedulerDriver, executorId: ExecutorID, slaveId: SlaveID, data: Array[Byte]): Unit = {
@@ -34,7 +36,7 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
   }
 
   override def statusUpdate(driver: SchedulerDriver, status: TaskStatus) {
-    println(s"received status update $status")
+    logger.info(s"received status update $status")
     TaskQueue.updateState(status.getTaskId.getValue, status.getState)
   }
 
@@ -46,10 +48,10 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
    *
    */
   override def resourceOffers(driver: SchedulerDriver, offers: java.util.List[Offer]) {
-    println(s"Received resource offer size: ${offers.size()}")
+    logger.info(s"Received resource offer size: ${offers.size()}")
     //for every available offer run tasks
     for (offer <- offers.asScala) {
-      println(s"offer $offer")
+      logger.info(s"offer $offer")
       TaskQueue.findNext.foreach { goTask =>
         val mesosTask = deployGoAgentTask(goTask, offer)
         mesosTask match {
@@ -58,7 +60,7 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
             TaskQueue.add(goTask.copy(state = GoTaskState.Scheduled))
           }
           case None => {
-            println(s"declining unused offer because offer is not enough")
+            logger.info(s"declining unused offer because offer is not enough")
             driver.declineOffer(offer.getId)
           }
         }
@@ -126,30 +128,21 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
   }
 
   override def reregistered(driver: SchedulerDriver, masterInfo: MasterInfo) {
-    println(s"RE-registered with mesos master.")
+    logger.info(s"RE-registered with mesos master.")
   }
 
   override def registered(driver: SchedulerDriver, frameworkId: FrameworkID, masterInfo: MasterInfo) {
-    println(s"registered with mesos master. Framework id is ${frameworkId.getValue}")
+    logger.info(s"registered with mesos master. Framework id is ${frameworkId.getValue}")
   }
 }
 
 
-  object GoCDMesosFramework extends App {
-   val config = new FrameworkConfig(ConfigFactory.load())
-
+  object GoCDMesosFramework extends App with GocdMesosLogger {
+    val config = new FrameworkConfig(ConfigFactory.load())
     val id = "GOCD-Mesos-" + System.currentTimeMillis()
-
-
-    println(s"The Framework id is $id")
-
-
-    val goTaskQueue = TaskQueue()
+    logger.info(s"The Framework id is $id")
 
     val poller = GOCDPoller(config)
-   // val timeInterval = 2 * 60 * 1000
-
-
     val frameworkInfo = FrameworkInfo.newBuilder()
       .setId(FrameworkID.newBuilder().setValue(id).build())
       .setName("GOCD-Mesos")
@@ -162,7 +155,20 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
 
     val scheduler = new GoCDScheduler(config)
     val driver = new MesosSchedulerDriver(scheduler, frameworkInfo, config.mesosMaster)
+    val scalar = GOCDScalar(config, poller, driver)
     println("Starting the driver")
+
+    val timeInterval = 3 * 60 * 1000
+    val runnable = new Runnable {
+      override def run(): Unit = {
+        while(true) {
+          scalar.reconcileAndScale
+          Thread.sleep(timeInterval)
+        }
+      }
+    }
+
+    val status = if(driver.run() == Status.DRIVER_STOPPED)  0 else 1
     // Ensure that the driver process terminates.
     driver.stop()
     // For this test to pass reliably on some platforms, this sleep is
@@ -174,4 +180,5 @@ class GoCDScheduler(conf : FrameworkConfig) extends Scheduler {
     // and its associated tasks via the Java API and wait until their
     // teardown is complete to exit.
     Thread.sleep(500)
+    System.exit(status)
   }

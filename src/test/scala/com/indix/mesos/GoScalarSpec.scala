@@ -25,11 +25,19 @@ class GoScalarSpec extends FlatSpec with Matchers {
 
   val scalar = new GOCDScalar(conf, poller, driver)
 
-  "GoCDScalar#computeScaledown" should "return correct number to scale up" in {
+  "GoCDScalar#computeScaledown" should "return correct number to scale down" in {
     scalar.computeScaledown(9, 6, 12, 2) should be (3)
     scalar.computeScaledown(14, 13, 12, 2) should be (2)
     scalar.computeScaledown(4, 0, 12, 2) should be (2)
     scalar.computeScaledown(12, 0, 12, 2) should be (10)
     scalar.computeScaledown(12, 1, 12, 2) should be (10)
+  }
+
+  "GoCDScalar#computeScaleUp" should "return correct number to scale up" in {
+    scalar.computeScaleup(6, 9, 12, 2) should be (3)
+    scalar.computeScaleup(13, 14, 12, 2) should be (0)
+    scalar.computeScaleup(0, 4, 12, 2) should be (4)
+    scalar.computeScaleup(0, 14, 12, 2) should be (12)
+    scalar.computeScaleup(1, 12, 12, 2) should be (11)
   }
 }

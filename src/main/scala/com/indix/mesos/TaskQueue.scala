@@ -45,7 +45,7 @@ object GoTask {
   }
 }
 
-case class TaskQueue(queue: Map[String, GoTask] = Map.empty[String, GoTask]) {
+private[mesos] case class TaskQueue(queue: Map[String, GoTask] = Map.empty[String, GoTask]) {
 
   def getRunningJobs = {
     queue.values.filter { task: GoTask =>

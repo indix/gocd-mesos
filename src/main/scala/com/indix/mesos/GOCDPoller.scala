@@ -46,7 +46,7 @@ case class GOCDPoller(conf: FrameworkConfig) {
       }.getOrElse(0)
   }
 
-  def getGoAgents: List[GoAgent] = {
+  def getAllAgents: List[GoAgent] = {
     println("Polling Go server for agents")
     withRetry(3) {
       val responseJson = jsonRequest(buildUrl() + "/go/api/agents")
@@ -59,12 +59,12 @@ case class GOCDPoller(conf: FrameworkConfig) {
     }.getOrElse(List.empty)
   }
 
-  def goIdleAgents: List[GoAgent] = {
-    getGoAgents.filter(_.status.equalsIgnoreCase("idle"))
+  def getIdleAgents: List[GoAgent] = {
+    getAllAgents.filter(_.status.equalsIgnoreCase("idle"))
   }
 
   def getBuildingAgents = {
-    getGoAgents.filter(_.status.equalsIgnoreCase("building"))
+    getAllAgents.filter(_.status.equalsIgnoreCase("building"))
   }
 
 
